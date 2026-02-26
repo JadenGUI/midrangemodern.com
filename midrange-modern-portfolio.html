@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midrange Modern — IBM i Modernization</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #111111;
+            --surface-raised: #1a1a1a;
+            --border: #222222;
+            --border-hover: #333333;
+            --text: #e8e8e8;
+            --text-muted: #888888;
+            --accent: #00d47b;
+            --accent-dim: #00d47b22;
+            --accent-glow: #00d47b44;
+            --terminal: #00d47b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* ── Scanline overlay ── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,212,123,0.015) 2px,
+                rgba(0,212,123,0.015) 4px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* ── Navigation ── */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+            padding: 1.25rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10,10,10,0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--accent);
+            letter-spacing: -0.5px;
+        }
+
+        .logo span {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: color 0.3s;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .nav-links a:hover { color: var(--accent); }
+
+        /* ── Hero ── */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 8rem 2rem 4rem;
+            max-width: 1100px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .hero-tag {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--accent);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            animation: fadeUp 0.8s ease forwards 0.2s;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: -2px;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            animation: fadeUp 0.8s ease forwards 0.4s;
+        }
+
+        .hero h1 .highlight {
+            color: var(--accent);
+            position: relative;
+        }
+
+        .hero-desc {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin-bottom: 2.5rem;
+            opacity: 0;
+            animation: fadeUp 0.8s ease forwards 0.6s;
+        }
+
+        .hero-cta {
+            display: flex;
+            gap: 1rem;
+            opacity: 0;
+            animation: fadeUp 0.8s ease forwards 0.8s;
+        }
+
+        .btn-primary {
+            display: inline-block;
+            padding: 0.9rem 2rem;
+            background: var(--accent);
+            color: var(--bg);
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 700;
+            font-size: 0.95rem;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 30px var(--accent-glow);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            display: inline-block;
+            padding: 0.9rem 2rem;
+            background: transparent;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 500;
+            font-size: 0.95rem;
+            text-decoration: none;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* ── Terminal decoration ── */
+        .terminal-float {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 380px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            opacity: 0;
+            animation: fadeUp 0.8s ease forwards 1s;
+        }
+
+        .terminal-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 14px;
+            background: var(--surface-raised);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .terminal-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #333;
+        }
+
+        .terminal-dot:nth-child(1) { background: #ff5f57; }
+        .terminal-dot:nth-child(2) { background: #ffbd2e; }
+        .terminal-dot:nth-child(3) { background: #28c840; }
+
+        .terminal-body {
+            padding: 1.25rem;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+            line-height: 1.9;
+            color: var(--terminal);
+        }
+
+        .terminal-body .comment { color: #555; }
+        .terminal-body .keyword { color: #ff7b72; }
+        .terminal-body .string { color: #a5d6ff; }
+        .terminal-body .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 14px;
+            background: var(--accent);
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+        }
+
+        /* ── Section styles ── */
+        section {
+            padding: 6rem 2rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .section-label {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--accent);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 700;
+            letter-spacing: -1.5px;
+            margin-bottom: 1rem;
+        }
+
+        .section-desc {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 550px;
+            margin-bottom: 3rem;
+        }
+
+        /* ── Services grid ── */
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .service-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 2rem;
+            transition: all 0.4s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+            transform: scaleX(0);
+            transition: transform 0.4s;
+        }
+
+        .service-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-4px);
+        }
+
+        .service-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .service-icon {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--accent);
+            background: var(--accent-dim);
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            margin-bottom: 1.25rem;
+            letter-spacing: 1px;
+        }
+
+        .service-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.5px;
+        }
+
+        .service-card p {
+            color: var(--text-muted);
+            font-size: 0.925rem;
+            line-height: 1.7;
+        }
+
+        /* ── Projects ── */
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .project-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.4s;
+        }
+
+        .project-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-4px);
+        }
+
+        .project-header {
+            padding: 1.5rem 2rem 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .project-tech {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.5rem;
+        }
+
+        .tech-tag {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--accent);
+            background: var(--accent-dim);
+            padding: 3px 8px;
+            border-radius: 3px;
+            letter-spacing: 0.5px;
+        }
+
+        .project-body {
+            padding: 1.25rem 2rem 2rem;
+        }
+
+        .project-body h3 {
+            font-size: 1.15rem;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.3px;
+        }
+
+        .project-body p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .project-stat {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        /* ── About ── */
+        .about-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: start;
+        }
+
+        .about-text p {
+            color: var(--text-muted);
+            font-size: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .about-text strong {
+            color: var(--text);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .stat-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-box .number {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent);
+            display: block;
+        }
+
+        .stat-box .label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.35rem;
+        }
+
+        /* ── Contact ── */
+        .contact-section {
+            text-align: center;
+            padding: 6rem 2rem 8rem;
+        }
+
+        .contact-section .section-desc {
+            margin: 0 auto 2.5rem;
+        }
+
+        .contact-email {
+            font-family: 'Space Mono', monospace;
+            font-size: clamp(1rem, 2.5vw, 1.4rem);
+            color: var(--accent);
+            text-decoration: none;
+            padding: 1rem 2.5rem;
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+
+        .contact-email:hover {
+            background: var(--accent);
+            color: var(--bg);
+            box-shadow: 0 0 40px var(--accent-glow);
+        }
+
+        /* ── Footer ── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 2rem;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #444;
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* ── Divider ── */
+        .divider {
+            max-width: 1100px;
+            margin: 0 auto;
+            border: none;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ── Animations ── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .terminal-float { display: none; }
+            .about-content { grid-template-columns: 1fr; }
+            .nav-links { display: none; }
+        }
+
+        @media (max-width: 600px) {
+            .hero { padding: 7rem 1.25rem 3rem; }
+            section { padding: 4rem 1.25rem; }
+            .hero-cta { flex-direction: column; }
+            .services-grid, .projects-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+    <div class="logo">MIDRANGE<span>MODERN</span></div>
+    <ul class="nav-links">
+        <li><a href="#services">Services</a></li>
+        <li><a href="#work">Work</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#contact">Contact</a></li>
+    </ul>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <div>
+        <p class="hero-tag">IBM i &bull; RPG &bull; Modernization</p>
+        <h1>Your AS/400 isn't<br>the problem.<br><span class="highlight">The interface is.</span></h1>
+        <p class="hero-desc">I modernize IBM i systems with web frontends, mobile scanning, and real-time integrations — without ripping out what already works.</p>
+        <div class="hero-cta">
+            <a href="#contact" class="btn-primary">Get in Touch</a>
+            <a href="#work" class="btn-secondary">See My Work</a>
+        </div>
+    </div>
+
+    <div class="terminal-float">
+        <div class="terminal-bar">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+        </div>
+        <div class="terminal-body">
+            <span class="comment">// warehouse-api/routes.js</span><br>
+            <span class="keyword">const</span> db2 = <span class="keyword">require</span>(<span class="string">'idb-connector'</span>);<br><br>
+            <span class="keyword">app</span>.get(<span class="string">'/api/pallets/:loc'</span>, <span class="keyword">async</span> (req, res) => {<br>
+            &nbsp;&nbsp;<span class="keyword">const</span> result = <span class="keyword">await</span> db2.query(<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`SELECT * FROM PALLETLIB.LOCATIONS<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WHERE LOC_ID = ?`</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;[req.params.loc]<br>
+            &nbsp;&nbsp;);<br>
+            &nbsp;&nbsp;res.json(result);<br>
+            });<span class="cursor"></span>
+        </div>
+    </div>
+</section>
+
+<hr class="divider">
+
+<!-- Services -->
+<section id="services">
+    <p class="section-label">What I Do</p>
+    <h2 class="section-title">Modernization that<br>meets you where you are</h2>
+    <p class="section-desc">Your IBM i runs your business. I make it easier to use, faster to operate, and ready for what's next.</p>
+
+    <div class="services-grid">
+        <div class="service-card">
+            <div class="service-icon">WEBUI</div>
+            <h3>Web Frontends for IBM i</h3>
+            <p>Replace green screens with responsive web interfaces that talk directly to your DB2 data. Your team gets a modern UI — your RPG programs keep running.</p>
+        </div>
+        <div class="service-card">
+            <div class="service-icon">SCAN</div>
+            <h3>Mobile Scanning Solutions</h3>
+            <p>Barcode and QR code scanning from any phone or tablet. Real-time inventory updates, bilingual interfaces, and no more clipboards in the warehouse.</p>
+        </div>
+        <div class="service-card">
+            <div class="service-icon">INTG</div>
+            <h3>System Integration</h3>
+            <p>Connect your AS/400 to the tools your team already uses — APIs, dashboards, reporting platforms. Your IBM i data, accessible everywhere it needs to be.</p>
+        </div>
+        <div class="service-card">
+            <div class="service-icon">DB2</div>
+            <h3>Database Design & Optimization</h3>
+            <p>Normalized DB2 schemas, SQLRPGLE programs, and data structures built for performance. Clean architecture that scales with your operation.</p>
+        </div>
+        <div class="service-card">
+            <div class="service-icon">OPS</div>
+            <h3>Warehouse & Inventory Systems</h3>
+            <p>Purpose-built warehouse management running natively on IBM i. Pallet tracking, location management, and inventory workflows designed for cold storage and distribution.</p>
+        </div>
+        <div class="service-card">
+            <div class="service-icon">RPG</div>
+            <h3>RPG Development</h3>
+            <p>New RPGLE and SQLRPGLE programs, maintenance of existing codebases, and migration from legacy fixed-format RPG to modern free-format.</p>
+        </div>
+        <div class="service-card">
+            <div class="service-icon">FIN</div>
+            <h3>Financial Process Automation</h3>
+            <p>Streamline invoicing, reporting, and bookkeeping workflows tied to your IBM i data. Automated reconciliation, Excel report generation, and integrations between your ERP and accounting systems — less manual entry, fewer errors.</p>
+        </div>
+    </div>
+</section>
+
+<hr class="divider">
+
+<!-- Work -->
+<section id="work">
+    <p class="section-label">Recent Work</p>
+    <h2 class="section-title">Built for the real world</h2>
+    <p class="section-desc">Production systems handling real inventory at scale — not classroom exercises.</p>
+
+    <div class="projects-grid">
+        <div class="project-card">
+            <div class="project-header">
+                <div>
+                    <div class="project-tech">
+                        <span class="tech-tag">SQLRPGLE</span>
+                        <span class="tech-tag">DB2</span>
+                        <span class="tech-tag">NODE.JS</span>
+                        <span class="tech-tag">EXPRESS</span>
+                    </div>
+                </div>
+                <span class="project-stat">11</span>
+            </div>
+            <div class="project-body">
+                <h3>Warehouse Pallet Management System</h3>
+                <p>Full-stack warehouse management app running on IBM i. 11 normalized DB2 tables, SQLRPGLE backend programs, REST APIs via Node.js/Express, and a responsive web frontend — replacing manual tracking across 17,600+ pallet locations.</p>
+            </div>
+        </div>
+
+        <div class="project-card">
+            <div class="project-header">
+                <div>
+                    <div class="project-tech">
+                        <span class="tech-tag">QR CODES</span>
+                        <span class="tech-tag">MOBILE</span>
+                        <span class="tech-tag">BILINGUAL</span>
+                    </div>
+                </div>
+                <span class="project-stat">📱</span>
+            </div>
+            <div class="project-body">
+                <h3>Mobile Barcode Scanning System</h3>
+                <p>Phone-based scanning workflow replacing handwritten pallet location tracking in freezer warehouse environments. QR code label generation, real-time inventory updates, and English/Spanish interface for the full warehouse team.</p>
+            </div>
+        </div>
+
+        <div class="project-card">
+            <div class="project-header">
+                <div>
+                    <div class="project-tech">
+                        <span class="tech-tag">IBM i</span>
+                        <span class="tech-tag">DDS</span>
+                        <span class="tech-tag">CL</span>
+                        <span class="tech-tag">RPGLE</span>
+                    </div>
+                </div>
+                <span class="project-stat">17K+</span>
+            </div>
+            <div class="project-body">
+                <h3>Production AS/400 Operations</h3>
+                <p>Hands-on production access to IBM i systems managing 17,600+ pallet locations in cold storage. DDS display files, CL programs, and RPGLE development deployed directly into live operational environments.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<hr class="divider">
+
+<!-- About -->
+<section id="about">
+    <p class="section-label">About</p>
+    <h2 class="section-title">The new generation<br>of IBM i</h2>
+
+    <div class="about-content">
+        <div class="about-text">
+            <p>I'm Jaden — an <strong>Operations & Inventory Analyst</strong> who learned IBM i by solving real problems in a cold storage warehouse, not in a classroom.</p>
+            <p>When our warehouse needed better pallet tracking, I didn't wait for a consultant. I learned RPG, built the database, wrote the programs, and deployed to production. When the team needed to ditch clipboards, I built mobile scanning.</p>
+            <p>Most IBM i developers are retiring. I'm just getting started. I combine <strong>deep warehouse operations knowledge</strong> with <strong>modern development skills</strong> to build solutions that actually get used by the people on the floor.</p>
+            <p>Based in <strong>Southern California</strong>. Available for remote and on-site work.</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <span class="number">17,600+</span>
+                <span class="label">Pallet locations managed</span>
+            </div>
+            <div class="stat-box">
+                <span class="number">11</span>
+                <span class="label">DB2 tables designed</span>
+            </div>
+            <div class="stat-box">
+                <span class="number">PROD</span>
+                <span class="label">Production system access</span>
+            </div>
+            <div class="stat-box">
+                <span class="number">2</span>
+                <span class="label">Languages (EN/ES)</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<hr class="divider">
+
+<!-- Contact -->
+<section id="contact" class="contact-section">
+    <p class="section-label">Let's Talk</p>
+    <h2 class="section-title">Ready to modernize?</h2>
+    <p class="section-desc">Whether you need a web frontend, mobile scanning, or custom RPG development — let's figure out the right solution for your operation.</p>
+    <a href="mailto:jaden@midrangemodern.com" class="contact-email">jaden@midrangemodern.com</a>
+</section>
+
+<!-- Footer -->
+<footer>
+    <p>&copy; 2026 Midrange Modern. Built on IBM i.</p>
+</footer>
+
+</body>
+</html>
